@@ -1,0 +1,157 @@
+---
+title: "СОЗДАНИЕ МОДЕЛЕЙ ЛИНЕЙНОЙ РЕГРЕССИИ ПОТОКОВ  ПАРОВ ВОДЫ ЗА ВЕСЕННИЙ ПЕРИОД 2013 ГОДА ПО ДАННЫМ ИЗМЕРЕНИЙ МЕТОДОМ ТУРБУЛЕНТНОЙ ПУЛЬСАЦИИ"
+author: "Евдокимова Валерия"
+date: "`27 марта 2018 года`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+Для создания модели линейной регрессии дневных потоков паров воды были взяты данные за осенний период 2013 года по данным измерений методом турбулентной пульсации.
+Табличным данным, надо которыми производилась работа, было присвоено имя tb1 для удобства работы.
+В ходе запуска файла “eddy” выяснилось, что переменная представляет собой огромный массив данных, который необходимо преобразовать для дальнейшей работы. Так как данные были получены компьютером, то некоторые отсутствующие значения были представлены в виде “-9999”, которые заменили на "NA". Помимо недостающих значений присутствовали текстовые данные, которые мы удалили, так как они помешали бы проведению обработки данных и корреляции.
+
+![R Studio](C:\Users\Валерия\Desktop\рис.5.PNG)
+
+
+
+## Загрузка файла и его очистка от ненужных данных
+
+
+```tb1=read.csv("C:/Users/Валерия/Downloads/eddypro.csv",
+skip = 1, na =c("","NA","-9999","-9999.0"), comment=c("["))
+tb1
+Далее уберем ненужные в ходе работы переменные.
+tb1 = tb1[-1,]
+tb1
+glimpse(tb1)
+names(tb1)
+tb1 = select(tb1, -(roll))
+tb1<-tb1[,c(-1,-3,-9,-12,-15,-18,-21,-30,-35,-70,-88:-99)]
+names(tb1) #удаляем первую строчку
+tb1 = tb1[-1,]
+tb1
+glimpse(tb1)
+names(tb1)
+tb1 = select(tb1, -(roll))
+tb1<-tb1[,c(-1,-3,-9,-12,-15,-18,-21,-30,-35,-70,-88:-99)]
+names(tb1))
+```
+
+## Выбор нужного время по условию задачи
+```
+tb1$daytime = as.logical(tb1$daytime)
+tb1 = subset(tb1, as.Date(date) >= as.Date("2013-05-13") & as.Date(date) <= as.Date("2013-05-31") & daytime == T)
+tb1
+```
+
+## Корреляционный анализ данных
+В следующем шаге для проведения корреляционного анализа выберем из таблицы только те колонки, которые являются числовыми. Только после этого можно будет провести корреляцию паров воды с другими факторами таблицы «eddy», при этом исключив все значения NA и выбрав только те факторы, коэффициент корреляции которых больше чем 0.1
+Преобразуем в факторы переменные типа char, которые содержат повторяющиеся значения
+
+```
+cor_td=cor(tb1_numeric)
+cor_td
+cor_td=cor(drop_na(tb1_numeric%>% as.data.frame %>% select(h2o_flux)))
+vars = row.names(cor_td)[cor_td$h2o_flux^2 > .1] %>% na.exclude
+vars
+```
+
+## Cоздание линейной модели
+После проведения корреляции получилась формула зависимости паров воды от переменных. Полученные данные корреляции собираем в модель и проводим анализ адекватности модели, исключая при этом переменные, которые не оказывают при взаимодействии влияния на потоки паров воды		Наблюдаем P-значения первой модели, отбрасываем те переменные, для которых он принимает незначимые значения.
+
+```
+formula=as.formula(paste("h2o_flux~", paste(vars,collapse = "+"), sep="")))
+formula
+```
+
+## Создание обучающей и контрольной выборки
+
+
+
+
+```
+row_numbers = 1:length(tb1$date)
+teach = sample(row_numbers, floor(length(tb1$date)*.7))
+test = row_numbers[-teach]
+teaching_tb1_unq = tb1[teach,]
+testing_tb1_unq = tb1[test,]
+mod = lm(formula, data=tb1)
+mod
+coef(mod)
+resid(mod)
+confint(mod)
+summary(mod)
+anova(mod
+```
+
+##Создание модели множественной регресси
+
+Создаём и анализируем модели множественной регрессии с взаимодействием
+```
+mod1=lm(h2o_flux ~ (DOY  + H + LE + rand_err_LE +
+rand_err_co2_flux + h2o_flux + rand_err_h2o_flux +
+H_strg  + T. + un_Tau + un_H + un_LE +
+un_h2o_flux  +  h2o_var +
+w.ts_cov  + w.h2o_cov)^2,data=tb1)
+model1
+coef(mod1)
+resid(mod1)
+confint(mod1)
+summary(mod1)
+```
+Убираем лишние переменные и взаимодействия с высокими Р-значениями
+anova(mod1)
+Проделываем циклично до тех пор, пока не будет получена идеальная модель, в которой все переменные и взаимодействия будут значимыми, при этом коэффициент детерминации будет оставаться неизменным или меняться незначительно.
+Готовая полученная модель, она же оптимальная:
+```
+mod4=lm(h2o_flux ~ (DOY  + H + LE + rand_err_LE + 
+                      rand_err_co2_flux + h2o_flux + rand_err_h2o_flux + 
+                      H_strg  + T. + un_Tau + un_H + un_LE + 
+                      un_h2o_flux  +  h2o_var +  w.ts_cov  + w.h2o_cov)^2-DOY:un_H-DOY:w.ts_cov-DOY:w.h2o_cov-
+          H:LE-H:rand_err_co2_flux-h2o_flux:H-H:H_strg-H:T.-H:un_Tau-
+          H:un_H-H:un_LE-H:un_h2o_flux-H:h2o_var-H:w.ts_cov-H:w.h2o_cov-LE:rand_err_LE -
+          h2o_flux:LE-LE:rand_err_h2o_flux -LE:H_strg-LE:T.-LE:un_H-LE:un_LE-
+          LE:un_h2o_flux-LE:h2o_var -LE:w.h2o_cov-rand_err_LE:rand_err_co2_flux-
+          h2o_flux:rand_err_LE-rand_err_LE:H_strg -rand_err_LE:rand_err_h2o_flux-
+          rand_err_LE:T.-rand_err_LE:un_Tau-rand_err_LE:un_LE-rand_err_LE:un_h2o_flux-
+          rand_err_LE:w.ts_cov-rand_err_LE:w.h2o_cov-rand_err_co2_flux:rand_err_h2o_flux-
+          rand_err_co2_flux:H_strg-rand_err_co2_flux:T.-rand_err_co2_flux:un_Tau-rand_err_co2_flux:un_H-
+          rand_err_co2_flux:h2o_var-rand_err_co2_flux:w.h2o_cov-h2o_flux:rand_err_h2o_flux-
+          h2o_flux:H_strg -h2o_flux:T.-h2o_flux:un_H-h2o_flux:un_LE-h2o_flux:un_h2o_flux-
+          h2o_flux:h2o_var-h2o_flux:w.h2o_cov-rand_err_h2o_flux:H_strg -rand_err_h2o_flux:T.-
+          rand_err_h2o_flux:un_Tau-rand_err_h2o_flux:un_LE -rand_err_h2o_flux:un_h2o_flux-
+          rand_err_h2o_flux:w.ts_cov-rand_err_h2o_flux:w.h2o_cov-H_strg:T.-H_strg:un_Tau-
+          H_strg:un_H-H_strg:un_LE-H_strg:un_h2o_flux-H_strg:h2o_var-H_strg:w.ts_cov-
+          H_strg:w.h2o_cov-T.:un_H-T.:un_LE-T.:un_h2o_flux-T.:h2o_var-T.:w.h2o_cov-
+          un_Tau:un_H-un_Tau:h2o_var-un_H:w.ts_cov-un_H:w.h2o_cov-un_LE:un_h2o_flux-
+          un_LE:h2o_var-un_LE:w.h2o_cov-un_h2o_flux:h2o_var-un_h2o_flux:w.h2o_cov-h2o_var:w.ts_cov-
+          h2o_var:w.h2o_cov-w.ts_cov:w.h2o_cov-H:rand_err_LE-H:rand_err_h2o_flux-
+          rand_err_LE:un_H-rand_err_LE:h2o_var-rand_err_co2_flux:w.ts_cov-rand_err_h2o_flux:un_H-
+          rand_err_h2o_flux:h2o_var-T.:w.ts_cov -un_H:h2o_var-DOY-H-DOY:H -un_H ,data=tb1)
+```
+Для визуализации итоговых данных ниже предствалены результаты anova(mod4) на рисунке 1 и графики, характеризующие полученную модель (рисунок 2-4).
+![Рисунок 1](C:\Users\Валерия\Desktop\рис.1.PNG)
+
+![Рисунок 2](C:\Users\Валерия\Desktop\рис.2.PNG)
+
+
+![Рисунок 3](C:\Users\Валерия\Desktop\рис.3.PNG)
+
+![Рисунок 4](C:\Users\Валерия\Desktop\рис.4.PNG)
+
+![Спасибо за внимание](C:\Users\Валерия\Desktop\050.jpg)
+
+
+
+
+
+
